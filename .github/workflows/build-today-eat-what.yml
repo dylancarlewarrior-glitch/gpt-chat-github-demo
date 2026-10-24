@@ -26,10 +26,11 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Install Android platform
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Ensure Android platform is installed
+        run: |
+          echo "Android SDK: $ANDROID_HOME"
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
       - name: Build installable APK
         working-directory: today-eat-what
         run: gradle --no-daemon :app:assembleDebug

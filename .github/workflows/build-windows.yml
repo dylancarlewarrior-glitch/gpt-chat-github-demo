@@ -1,0 +1,57 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "electron-main.cjs"
+      - "package.json"
+      - ".github/workflows/build-windows.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-installer:
+    name: Package and verify EXE
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Get source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install desktop build dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Package Windows setup program
+        run: npm run dist:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Confirm Windows EXE exists
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem -Path dist -Filter '*.exe' -File)
+          if ($files.Count -eq 0) { throw "No EXE generated in dist" }
+          foreach ($file in $files) {
+            $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
+            if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) {
+              throw "Invalid Windows EXE header: $($file.Name)"
+            }
+            Write-Host "Verified PE/MZ EXE header: $($file.Name) ($($file.Length) bytes)"
+          }
+
+      - name: Make EXE downloadable
+        uses: actions/upload-artifact@v4
+        with:
+          name: Startrail-Calculator-Windows-Setup
+          path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 14

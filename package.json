@@ -1,0 +1,44 @@
+{
+  "name": "startrail-calculator-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Windows desktop packaging for the existing Startrail Calculator demo.",
+  "main": "electron-main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.9.3",
+    "electron-builder": "26.17.0"
+  },
+  "build": {
+    "appId": "com.chatgptdemo.startrailcalculator",
+    "productName": "星轨计算器",
+    "files": [
+      "index.html",
+      "electron-main.cjs",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Startrail-Calculator-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

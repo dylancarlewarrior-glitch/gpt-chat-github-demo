@@ -1,0 +1,46 @@
+name: Build 今天吃什麼 Android APK
+on:
+  push:
+    branches:
+      - android-today-eat-what
+    paths:
+      - 'today-eat-what/**'
+      - '.github/workflows/build-today-eat-what.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Build installable APK
+        working-directory: today-eat-what
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Prepare APK
+        run: |
+          mkdir -p apk-output
+          cp today-eat-what/app/build/outputs/apk/debug/app-debug.apk apk-output/JinTianChiShenMe.apk
+          sha256sum apk-output/JinTianChiShenMe.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: today-eat-what-android-apk
+          path: apk-output/JinTianChiShenMe.apk
+          if-no-files-found: error

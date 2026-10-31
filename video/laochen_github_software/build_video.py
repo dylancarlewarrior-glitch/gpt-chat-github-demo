@@ -97,6 +97,39 @@ def tts(row,i):
                 print("TTS website success",i,dur(out));return out,"VoiceCraft / YunzeNeural"
         print("site response",i,r.status_code,r.text[:130])
     except Exception as e:print("site unavailable",i,str(e)[:180])
+    # Same Microsoft neural voice ID via another documented public TTS provider;
+    # never accept a different or default voice in its place.
+    try:
+        vr=requests.get("https://freetts.org/api/voices",timeout=15)
+        supported=vr.ok and VOICE in vr.text
+        if supported:
+            ar=requests.post("https://freetts.org/api/tts",json={
+                "text":script,"voice":VOICE,"rate":"+0%","pitch":"-3Hz"
+            },timeout=55)
+            if ar.ok and ar.json().get("file_id"):
+                fid=ar.json()["file_id"]
+                audio=requests.get("https://freetts.org/api/audio/"+str(fid),timeout=60)
+                if audio.ok and len(audio.content)>800 and "audio" in audio.headers.get("Content-Type",""):
+                    out.write_bytes(audio.content)
+                    if dur(out)>3:
+                        print("FreeTTS same Yunze voice OK",i,dur(out))
+                        return out,"FreeTTS / "+VOICE
+            print("FreeTTS returned",ar.status_code,ar.text[:130])
+        else:print("FreeTTS voice list does not confirm Yunze",vr.status_code)
+    except Exception as e:print("FreeTTS unavailable:",str(e)[:180])
+    try:
+        # The service documents accepting Microsoft voice ShortName on /tts.
+        alt=requests.post("https://tts.kina.ink/tts",json={
+            "text":script,"voice":VOICE,"rate":"+0%",
+            "volume":"+0%","pitch":"-3Hz","format":"mp3"
+        },timeout=55)
+        if alt.ok and len(alt.content)>800 and "audio" in alt.headers.get("Content-Type",""):
+            out.write_bytes(alt.content)
+            if dur(out)>3:
+                print("Kina TTS same Yunze voice OK",i,dur(out))
+                return out,"Kina TTS / "+VOICE
+        print("Kina TTS response",alt.status_code,alt.text[:130] if len(alt.content)<1000 else alt.headers.get("Content-Type",""))
+    except Exception as e:print("Kina TTS unavailable:",str(e)[:180])
     # Same Microsoft voice ID, independent endpoint if the site is not reachable.
     import asyncio,edge_tts
     async def make():

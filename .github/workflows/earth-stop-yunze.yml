@@ -1,0 +1,49 @@
+name: Build Earth-Stops Short (Yunze voice)
+
+on:
+  pull_request:
+    paths:
+      - "earth-stop/**"
+      - ".github/workflows/earth-stop-yunze.yml"
+  push:
+    branches:
+      - "video/earth-stop-yunze-20261031"
+    paths:
+      - "earth-stop/**"
+      - ".github/workflows/earth-stop-yunze.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+      - name: Install runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+          python -m pip install --upgrade pip
+          python -m pip install 'edge-tts>=7.2.0' 'opencv-python-headless>=4.10' 'numpy>=2' 'Pillow>=11' 'opencc-python-reimplemented>=0.1.7'
+      - name: Render full 9:16 MP4 with genuine Yunze voice
+        run: |
+          python earth-stop/make_video.py
+      - name: Verify playable MP4 and voice duration
+        run: |
+          test -s earth-stop/output/earth_stops_yunze.mp4
+          ffprobe -v error -show_entries format=duration,size -of default=nw=1 earth-stop/output/earth_stops_yunze.mp4
+          test -s earth-stop/output/earth_stops_tc.srt
+      - name: Downloadable complete video
+        uses: actions/upload-artifact@v4
+        with:
+          name: earth-stop-yunze-mp4-and-subtitles
+          path: |
+            earth-stop/output/earth_stops_yunze.mp4
+            earth-stop/output/earth_stops_tc.srt
+            earth-stop/output/timeline.json
+          retention-days: 14
+          if-no-files-found: error

@@ -1,0 +1,49 @@
+name: Laochen Open Source Video
+on:
+  push:
+    branches:
+      - video/laochen-open-source-20261031
+    paths:
+      - 'video/laochen_github_software/**'
+      - '.github/workflows/laochen-opensource-video.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install video and font dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto-cjk libass9
+          python -m pip install --disable-pip-version-check pillow pydub edge-tts opencc-python-reimplemented requests playwright
+          python -m playwright install chromium
+      - name: Generate voice, edit scenes, add Traditional subtitles, export MP4
+        run: |
+          python video/laochen_github_software/build_video.py | tee build.log
+          ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 video_out/短视频_5款GitHub开源神器.mp4
+      - name: Upload finished video, voice and publishing pack
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: laochen-github-open-source-video
+          path: |
+            video_out/短视频_5款GitHub开源神器.mp4
+            video_out/云泽配音.mp3
+            video_out/封面.jpg
+            video_out/繁體字幕.srt
+            video_out/繁體口播稿.txt
+            video_out/簡體口播稿.txt
+            video_out/來源清單.md
+            video_out/制作核验.json
+          retention-days: 30
+      - name: Upload diagnostic log if unsuccessful
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: laochen-build-debug
+          path: build.log
+          if-no-files-found: ignore

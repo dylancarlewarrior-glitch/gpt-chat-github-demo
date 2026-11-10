@@ -30,6 +30,8 @@ jobs:
         shell: bash
         run: |
           python -m pip install --upgrade "yt-dlp[default]" youtube-transcript-api
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
           ffmpeg -version | head -n 1
       - name: Try subtitles and video info
         shell: bash

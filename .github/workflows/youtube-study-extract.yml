@@ -1,0 +1,87 @@
+name: Extract YouTube study material (one-time)
+
+on:
+  push:
+    branches:
+      - "research/youtube-0JOTlOoZYf8-extract"
+    paths:
+      - ".github/workflows/youtube-study-extract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out isolated branch
+        uses: actions/checkout@v4
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Deno for YouTube JavaScript extraction
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Install tools
+        shell: bash
+        run: |
+          python -m pip install --upgrade "yt-dlp[default]" youtube-transcript-api
+          ffmpeg -version | head -n 1
+      - name: Try subtitles and video info
+        shell: bash
+        run: |
+          mkdir -p out/frames
+          set +e
+          yt-dlp --no-playlist --skip-download --write-subs --write-auto-subs --sub-langs "en.*,zh.*,ja.*,ko.*" --sub-format "vtt/best" --print "title=%(title)s" --print "duration_seconds=%(duration)s" --print "channel=%(channel)s" -o "out/video.%(ext)s" "https://www.youtube.com/watch?v=0JOTlOoZYf8" > out/metadata-and-subtitles.log 2>&1
+          echo "yt_dlp_metadata_exit_code=$?" >> out/status.txt
+          set -e
+      - name: Try transcript API fallback
+        shell: bash
+        run: |
+          python - <<'PY'
+          from youtube_transcript_api import YouTubeTranscriptApi
+          import json
+          from pathlib import Path
+          p=Path("out")
+          try:
+              api=YouTubeTranscriptApi()
+              result=api.fetch("0JOTlOoZYf8",languages=["en","zh-Hans","zh","ja"])
+              items=[{"start":x.start,"duration":x.duration,"text":x.text} for x in result]
+              (p/"transcript-fallback.json").write_text(json.dumps(items,ensure_ascii=False,indent=2),encoding="utf-8")
+              (p/"transcript-status.txt").write_text("success: "+str(len(items))+" segments")
+          except Exception as e:
+              (p/"transcript-status.txt").write_text(type(e).__name__+": "+str(e)[:8000])
+          PY
+      - name: Try video and extract representative frames
+        shell: bash
+        run: |
+          set +e
+          yt-dlp --no-playlist --max-filesize 150M --retries 1 --fragment-retries 1 -f "b[height<=360]/b" -o "out/source.%(ext)s" "https://www.youtube.com/watch?v=0JOTlOoZYf8" > out/video-download.log 2>&1
+          echo "yt_dlp_video_exit_code=$?" >> out/status.txt
+          find out -maxdepth 1 -name 'source.*' -type f | head -n 1 > out/video-found.txt
+          VIDEO="$(cat out/video-found.txt)"
+          if [ -n "$VIDEO" ]; then
+            DURATION="$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$VIDEO" 2>/dev/null)"
+            FPS="$(python -c 'import sys;print(16/max(float(sys.argv[1]),16))' "$DURATION")"
+            ffmpeg -nostdin -v error -i "$VIDEO" -vf "fps=$FPS,scale=960:-2" -frames:v 16 -q:v 4 "out/frames/frame_%03d.jpg"
+            echo "frames=$(find out/frames -name '*.jpg' | wc -l)" >> out/status.txt
+            rm -f "$VIDEO"
+          fi
+          set -e
+      - name: Upload captions, logs and image frames (no full video)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-0JOTlOoZYf8-study-extract
+          path: |
+            out/*.log
+            out/*.txt
+            out/*.vtt
+            out/*.json
+            out/frames/*.jpg
+          retention-days: 2
+          if-no-files-found: warn
